@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AUREUS 3D Store</title>
+<script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.158.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<style>
+html, body { margin: 0; padding: 0; overflow: hidden; height: 100%; background: #050507; font-family: sans-serif; }
+#three-container { width: 100%; height: 100%; }
+.welcome-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; background: rgba(0,0,0,0.95); z-index: 50; pointer-events: none; opacity: 1; }
+.welcome-overlay.active { pointer-events: auto; }
+.title { font-size: 32px; font-weight: 800; color: #fff; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 100; visibility: hidden; opacity: 0; transition: 0.3s; }
+.modal.active { visibility: visible; opacity: 1; }
+.modal-content { background: #fff; color: #000; padding: 20px; border-radius: 12px; width: 300px; max-width: 90%; }
+.modal-content input, .modal-content textarea { width: 100%; padding: 6px; margin: 6px 0; }
+.modal-content button { margin-top: 8px; padding: 10px 12px; border: none; border-radius: 6px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<main id="three-container"></main>
+
+<div class="welcome-overlay active" id="welcome">
+  <h1 class="title">Welcome to AUREUS</h1>
+  <p>Click or press any key to enter</p>
+</div>
+
+<div class="modal" id="order-modal">
+  <div class="modal-content">
+    <h2 id="order-title">Place Order</h2>
+    <p id="order-product">Product:</p>
+    <label>Quantity:</label><input type="number" id="quantity" min="1" value="1"/>
+    <label>Shipping Address:</label><textarea id="address" rows="3"></textarea>
+    <button id="confirm-order">Confirm</button>
+    <button id="close-modal" style="background:#666;color:#fff">Cancel</button>
+  </div>
+</div>
+
+<script>
+/* === Three.js setup === */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050507);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0,5,15);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.getElementById('three-container').appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enabled = false;
+
+const light = new THREE.PointLight(0xffffff,1);
+light.position.set(10,20,10);
+scene.add(light);
+
+/* --- Products --- */
+const productData = [
+  {name:"Signature Jacket", price:"$980", color:0x8844ff},
+  {name:"Luxury Sneakers", price:"$750", color:0xff8844},
+  {name:"Designer Hat", price:"$320", color:0x44ff88},
+  {name:"Premium Hoodie", price:"$650", color:0xffff44},
+  {name:"Exclusive Bag", price:"$1250", color:0xff44aa}
+];
+const products = [];
+const geometry = new THREE.BoxGeometry(1.5,1.5,1.5);
+productData.forEach((p,i)=>{
+  const mat = new THREE.MeshStandardMaterial({color:p.color});
+  const cube = new THREE.Mesh(geometry, mat);
+  cube.position.set((i-2)*3,0.75,-5);
+  cube.userData = p;
+  scene.add(cube);
+  products.push(cube);
+});
+
+/* === Render loop === */
+function animate(){ requestAnimationFrame(animate); renderer.render(scene, camera); }
+animate();
+
+/* === Welcome overlay === */
+const welcome = document.getElementById('welcome');
+let overlayHidden = false;
+function hideOverlay(){
+  if(overlayHidden) return;
+  overlayHidden = true;
+  gsap.to(welcome, {opacity:0, duration:1, onComplete:()=>welcome.remove()});
+  controls.enabled = true;
+}
+setTimeout(hideOverlay, 3000); // auto hide after 3 sec
+welcome.addEventListener('click', hideOverlay);
+document.addEventListener('keydown', hideOverlay);
+
+/* === Raycasting products === */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+function onClick(event){
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(products);
+  if(intersects.length>0) openModal(intersects[0].object.userData);
+}
+window.addEventListener('click', onClick);
+
+/* === Modal === */
+const modal = document.getElementById('order-modal');
+const closeModal = document.getElementById('close-modal');
+const confirmOrder = document.getElementById('confirm-order');
+const orderProduct = document.getElementById('order-product');
+function openModal(product){
+  orderProduct.textContent = `Product: ${product.name} (${product.price})`;
+  modal.classList.add('active');
+}
+closeModal.addEventListener('click', ()=>modal.classList.remove('active'));
+confirmOrder.addEventListener('click', ()=>{
+  const qty=document.getElementById('quantity').value;
+  const addr=document.getElementById('address').value;
+  if(!addr){alert('Enter shipping address'); return;}
+  alert(`✅ Order Placed!\n${orderProduct.textContent}\nQuantity: ${qty}\nAddress: ${addr}`);
+  modal.classList.remove('active');
+});
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape' && modal.classList.contains('active')) modal.classList.remove('active');
+});
+
+/* === Responsive resize === */
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+
+</body>
+</html>
